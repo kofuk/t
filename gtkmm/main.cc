@@ -7,6 +7,15 @@ class MainWindow : public Gtk::Window {
     Gtk::Button button_;
     Gtk::Button move_button_;
 
+    void on_close() { this->close(); }
+
+    void move_window() {
+        int x;
+        int y;
+        this->get_position(x, y);
+        this->move(x, y + 10);
+    }
+
 public:
     MainWindow()
         : label_("Hello, world!"), button_("Click me!"),
@@ -23,14 +32,14 @@ public:
         container_.add(button_);
         container_.add(move_button_);
 
-        button_.signal_clicked().connect([this] { this->close(); });
+        // Why don't we use C++ lambda instead?
 
-        move_button_.signal_clicked().connect([this] {
-            int x;
-            int y;
-            this->get_position(x, y);
-            this->move(x, y + 10);
-        });
+        button_.signal_clicked().connect(
+            sigc::mem_fun(this, &MainWindow::on_close));
+
+        // On Wayland, this doesn't work.
+        move_button_.signal_clicked().connect(
+            sigc::mem_fun(this, &MainWindow::move_window));
 
         add(container_);
         show_all_children();
