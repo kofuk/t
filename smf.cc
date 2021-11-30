@@ -96,12 +96,13 @@ struct SMF_EventBuffer {
     std::size_t length;
     std::size_t cursor;
 
-    static SMF_EventBuffer from_file(std::FILE *f, std::uint32_t length) {
-        SMF_EventBuffer events;
-        events.length = length;
-        events.buffer = new std::uint8_t[static_cast<std::size_t>(length)];
-        events.cursor = 0;
-        std::fread(events.buffer, 1, events.length, f);
+    static SMF_EventBuffer *from_buffer(std::uint8_t *data,
+                                        std::size_t length) {
+        SMF_EventBuffer *events = new SMF_EventBuffer;
+        events->length = length;
+        events->buffer = new std::uint8_t[length];
+        events->cursor = 0;
+        std::memcpy(events->buffer, data, length);
         return events;
     }
 
@@ -233,34 +234,98 @@ struct SMF_Track {
     std::uint32_t get_data_length() { return exchange_order(data_length); }
 } __attribute__((packed));
 
+class SMFReader {
+    std::vector<std::uint8_t> data;
+    std::size_t cursor = 0;
+
+public:
+    SMFReader(std::vector<std::uint8_t> &&data) : data(std::move(data)) {}
+
+    SMF_Header *read_header() {
+        if (cursor + sizeof(SMF_Header) > data.size()) {
+            return nullptr;
+        }
+
+        SMF_Header *hdr = new SMF_Header;
+        std::memcpy(hdr, data.data() + cursor, sizeof(SMF_Header));
+        cursor += sizeof(SMF_Header);
+        return hdr;
+    }
+
+    SMF_Track *read_track_header() {
+        if (cursor + sizeof(SMF_Track) > data.size()) {
+            return nullptr;
+        }
+
+        SMF_Track *trk = new SMF_Track;
+        std::memcpy(trk, data.data() + cursor, sizeof(SMF_Track));
+        cursor += sizeof(SMF_Track);
+        return trk;
+    }
+
+    SMF_EventBuffer *create_event_reader(std::size_t length) {
+        if (cursor + length > data.size()) {
+            return nullptr;
+        }
+
+        std::size_t first = cursor;
+        cursor += length;
+        return SMF_EventBuffer::from_buffer(data.data() + first, length);
+    }
+};
+
+std::vector<std::uint8_t> data = {
+    0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x00,
+    0x02, 0x01, 0xE0, 0x4D, 0x54, 0x72, 0x6B, 0x00, 0x00, 0x00, 0x2A,
+    0x00, 0xFF, 0x51, 0x03, 0x0F, 0x42, 0x40, 0x00, 0xFF, 0x58, 0x04,
+    0x04, 0x02, 0x18, 0x08, 0x00, 0xFF, 0x59, 0x02, 0x00, 0x00, 0x00,
+    0xFF, 0x06, 0x04, 0x3F, 0x3F, 0x3F, 0x3F, 0x91, 0xCA, 0x00, 0xFF,
+    0x06, 0x03, 0x3F, 0x3F, 0x3F, 0x00, 0xFF, 0x2F, 0x00, 0x4D, 0x54,
+    0x72, 0x6B, 0x00, 0x00, 0x00, 0x26, 0x00, 0xFF, 0x03, 0x07, 0x4B,
+    0x6F, 0x6E, 0x74, 0x61, 0x6B, 0x74, 0x00, 0xFF, 0x7F, 0x09, 0x50,
+    0x72, 0x65, 0x53, 0x01, 0xFF, 0xDD, 0x61, 0x05, 0x8F, 0x00, 0x90,
+    0x3C, 0x66, 0x8F, 0x00, 0x80, 0x3C, 0x66, 0x00, 0xFF, 0x2F, 0x00,
+};
+
 int main() {
+#if 0
     std::string filename = "__60bpm.mid";
+    std::cout << filename << '\n';
+
     std::FILE *f = std::fopen(filename.c_str(), "rb");
     if (!f) {
         std::cout << "File not found.\n";
         return 1;
     }
-    std::cout << filename << '\n';
+    std::vector<std::uint8_t> data;
+    std::uint8_t buf[1024];
+    for (;;) {
+        std::size_t nr = std::fread(buf, 1, 1024, f);
+        if (nr == 0) break;
+        data.insert(data.end(), buf, buf + nr);
+    }
+    std::fclose(f);
+#endif
 
-    SMF_Header hdr;
-    std::fread(&hdr, sizeof(SMF_Header), 1, f);
-    std::cout << "Type:\t\t" << hdr.get_chunk_type() << '\n';
-    std::cout << "Length:\t\t" << hdr.get_data_length() << '\n';
-    std::cout << "Format:\t\t" << hdr.get_format() << '\n';
-    std::cout << "Track:\t\t" << hdr.get_n_track() << '\n';
-    std::cout << "Time Unit:\t" << hdr.get_time_unit() << '\n';
+    SMFReader reader(std::move(data));
 
-    for (std::uint16_t i = 0; i < hdr.get_n_track(); ++i) {
+    SMF_Header *hdr = reader.read_header();
+    std::cout << "Type:\t\t" << hdr->get_chunk_type() << '\n';
+    std::cout << "Length:\t\t" << hdr->get_data_length() << '\n';
+    std::cout << "Format:\t\t" << hdr->get_format() << '\n';
+    std::cout << "Track:\t\t" << hdr->get_n_track() << '\n';
+    std::cout << "Time Unit:\t" << hdr->get_time_unit() << '\n';
+
+    for (std::uint16_t i = 0; i < hdr->get_n_track(); ++i) {
         std::cout << '\n';
 
-        SMF_Track trk;
-        std::fread(&trk, sizeof(SMF_Track), 1, f);
-        std::cout << "Type:\t" << trk.get_chunk_type() << '\n';
-        std::cout << "Length:\t" << trk.get_data_length() << '\n';
-        SMF_EventBuffer events =
-            SMF_EventBuffer::from_file(f, trk.get_data_length());
+        SMF_Track *trk = reader.read_track_header();
+        std::cout << "Type:\t" << trk->get_chunk_type() << '\n';
+        std::cout << "Length:\t" << trk->get_data_length() << '\n';
+        SMF_EventBuffer *events = reader.create_event_reader(
+            static_cast<std::size_t>(trk->get_data_length()));
         SMF_Event *ev;
-        while ((ev = events.get_next()) != nullptr) {
+        while ((ev = events->get_next()) != nullptr) {
             std::cout << "  delta time: " << ev->delta_time << '\n';
             if (ev->smf_event_type == SMF_Event::EventType::SMF_META) {
                 SMF_MetaEvent *mev = static_cast<SMF_MetaEvent *>(ev);
@@ -324,6 +389,4 @@ int main() {
             }
         }
     }
-
-    std::fclose(f);
 }
