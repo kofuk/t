@@ -1,3 +1,4 @@
+// /usr/lib/emscripten/emcc -o out.html smf.cc -s WASM=1 --shell-file shell_minimal.html -s NO_EXIT_RUNTIME=1 -s "EXPORTED_RUNTIME_METHODS=['ccall']"
 #include <array>
 #include <cmath>
 #include <cstdio>
@@ -6,6 +7,10 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+
+#ifdef EMSCRIPTEN
+#include <emscripten/emscripten.h>
+#endif
 
 namespace {
     constexpr std::size_t SMF_NIDENT = 4;
@@ -109,10 +114,10 @@ struct SMF_EventBuffer {
     std::uint8_t running_status = 0;
 
     SMF_Event *get_next() {
-#define CHECK_BOUNDARY()                      \
-    do {                                      \
-        if (cursor >= length) return nullptr; \
-    } while (false)
+#define CHECK_BOUNDARY()                            \
+        do {                                        \
+            if (cursor >= length) return nullptr;   \
+        } while (false)
 
         CHECK_BOUNDARY();
 
@@ -131,13 +136,13 @@ struct SMF_EventBuffer {
         }
 
 #undef CHECK_BOUNDARY
-#define CHECK_BOUNDARY(forward)                                     \
-    do {                                                            \
-        if (cursor + static_cast<std::size_t>(forward) >= length) { \
-            delete ev;                                              \
-            return nullptr;                                         \
-        }                                                           \
-    } while (false)
+#define CHECK_BOUNDARY(forward)                                         \
+        do {                                                            \
+            if (cursor + static_cast<std::size_t>(forward) >= length) { \
+                delete ev;                                              \
+                return nullptr;                                         \
+            }                                                           \
+        } while (false)
         if (running_status == 0xF0) {
             SMF_SysExEvent *ev = new SMF_SysExEvent;
             ev->delta_time = delta_time;
@@ -287,6 +292,97 @@ std::vector<std::uint8_t> data = {
     0x3C, 0x66, 0x8F, 0x00, 0x80, 0x3C, 0x66, 0x00, 0xFF, 0x2F, 0x00,
 };
 
+#ifdef EMSCRIPTEN
+extern "C" {
+    void EMSCRIPTEN_KEEPALIVE run_parser(std::uint8_t *in, std::size_t len) {
+        std::vector<std::uint8_t> data(in, in + len);
+        SMFReader reader(std::move(data));
+
+        SMF_Header *hdr = reader.read_header();
+        std::cout << "Type:\t\t" << hdr->get_chunk_type() << '\n';
+        std::cout << "Length:\t\t" << hdr->get_data_length() << '\n';
+        std::cout << "Format:\t\t" << hdr->get_format() << '\n';
+        std::cout << "Track:\t\t" << hdr->get_n_track() << '\n';
+        std::cout << "Time Unit:\t" << hdr->get_time_unit() << '\n';
+
+        for (std::uint16_t i = 0; i < hdr->get_n_track(); ++i) {
+            std::cout << '\n';
+
+            SMF_Track *trk = reader.read_track_header();
+            std::cout << "Type:\t" << trk->get_chunk_type() << '\n';
+            std::cout << "Length:\t" << trk->get_data_length() << '\n';
+            SMF_EventBuffer *events = reader.create_event_reader(
+                static_cast<std::size_t>(trk->get_data_length()));
+            SMF_Event *ev;
+            while ((ev = events->get_next()) != nullptr) {
+                std::cout << "  delta time: " << ev->delta_time << '\n';
+                if (ev->smf_event_type == SMF_Event::EventType::SMF_META) {
+                    SMF_MetaEvent *mev = static_cast<SMF_MetaEvent *>(ev);
+                    if (mev->type == 0x00) {
+                        std::uint8_t buf[2] = {0};
+                        buf[0] = mev->ptr[1];
+                        buf[1] = mev->ptr[0];
+                        std::uint16_t n;
+                        std::memcpy(&n, buf, 2);
+                        std::cout << "    Sequence Number: " << n << '\n';
+                    } else if (mev->type == 0x51) {
+                        std::uint8_t buf[4] = {0};
+                        buf[0] = mev->ptr[2];
+                        buf[1] = mev->ptr[1];
+                        buf[2] = mev->ptr[0];
+                        int t;
+                        std::memcpy(&t, buf, 4);
+                        float tempo = 60'000'000.0 / t;
+                        std::cout << "    Tempo: " << tempo << '\n';
+                    } else if (mev->type == 0x02) {
+                        std::cout << "    Copyright: ";
+                        std::cout << std::string(reinterpret_cast<char *>(mev->ptr),
+                                                 mev->length)
+                                  << '\n';
+                    } else if (mev->type == 0x03) {
+                        std::cout << "    Track Name: ";
+                        std::cout << std::string(reinterpret_cast<char *>(mev->ptr),
+                                                 mev->length)
+                                  << '\n';
+                    } else if (mev->type == 0x06) {
+                        std::cout << "    Marker: ";
+                        std::cout << std::string(reinterpret_cast<char *>(mev->ptr),
+                                                 mev->length)
+                                  << '\n';
+                    } else if (mev->type == 0x2F) {
+                        std::cout << "    End of Track:\n";
+                    } else if (mev->type == 0x58) {
+                        std::cout << "    Time Signature: ";
+                        std::cout << +mev->ptr[0] << '/'
+                                  << std::pow(2, +mev->ptr[1]) << '\n';
+                    } else if (mev->type == 0x59) {
+                        std::cout << "    Key Signature: ";
+                        std::cout << +mev->ptr[0] << ',' << +mev->ptr[1] << '\n';
+                    } else if (mev->type == 0x7F) {
+                        std::cout << "    Sequencer Defined Meta Event: \n";
+                    } else {
+                        std::cout << "    meta event: " << +mev->type << '\n';
+                    }
+                } else if (ev->smf_event_type == SMF_Event::EventType::SMF_MIDI) {
+                    SMF_MidiEvent *mev = static_cast<SMF_MidiEvent *>(ev);
+                    if (mev->type == SMF_MidiEvent::EventType::MIDI_NOTE_ON) {
+                        std::cout << "    midi event: NOTE_ON\n";
+                    } else if (mev->type ==
+                               SMF_MidiEvent::EventType::MIDI_NOTE_OFF) {
+                        std::cout << "    midi event: NOTE_OFF\n";
+                    } else {
+                        std::cout << "    midi event: CC\n";
+                    }
+                } else if (ev->smf_event_type == SMF_Event::EventType::SMF_SYSEX) {
+                    std::cout << "    exclusive\n";
+                }
+            }
+        }
+    }
+}
+#endif
+
+#ifndef EMSCRIPTEN
 int main() {
 #if 0
     std::string filename = "__60bpm.mid";
@@ -390,3 +486,4 @@ int main() {
         }
     }
 }
+#endif

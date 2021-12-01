@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Emscripten-Generated Code</title>
+  </head>
+  <body>
+    <input type="file" id="f">
+    <script type='text/javascript'>
+     var Module = {
+         preRun: [],
+         postRun: [],
+         print: (function() {
+             return function(text) {
+                 console.log(text);
+             };
+         })(),
+         setStatus: function(text) {
+             if (text) console.log(text);
+         },
+     };
+
+     document.addEventListener('DOMContentLoaded', () => {
+         const f = document.getElementById('f');
+         f.addEventListener('change', () => {
+             const reader = new FileReader;
+             reader.addEventListener('load', () => {
+                 const fileContent = reader.result;
+                 buf = new Uint8Array(fileContent);
+                 Module.ccall('run_parser', null, ['array', 'number'], [buf, fileContent.byteLength]);
+             });
+             reader.readAsArrayBuffer(f.files[0]);
+         });
+     });
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>
