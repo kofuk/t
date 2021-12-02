@@ -9,11 +9,9 @@
      var Module = {
          preRun: [],
          postRun: [],
-         print: (function() {
-             return function(text) {
-                 console.log(text);
-             };
-         })(),
+         print: function(text) {
+             console.log(text);
+         },
          setStatus: function(text) {
              if (text) console.log(text);
          },
