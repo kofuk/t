@@ -1,0 +1,13 @@
+\newcommand{\ccinput}[1]{
+  \directlua{
+    chars = 0
+    for line in io.lines('#1') do
+      if line:len() == 0 then
+        tex.print([[\\\indent]])
+      end
+      tex.sprint(line)
+      chars = chars + utf8.len(line)
+    end
+    tex.sprint(' ('..chars..'文字)')
+  }
+}
