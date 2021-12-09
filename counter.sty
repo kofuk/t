@@ -1,3 +1,5 @@
+\usepackage{environ}
+
 \newcommand{\ccinput}[1]{
   \directlua{
     local chars = 0
@@ -8,3 +10,13 @@
     tex.sprint(' ('..chars..'文字)')
   }
 }
+
+\newcommand{\ccinsert}[1]{
+  \directlua{
+    local str = '\luaescapestring{#1}'
+    local nonewline = str:gsub(string.char(0x5c)..'par', ''):gsub(' ', '')
+    tex.print(str)
+    tex.print(' ('..utf8.len(nonewline)..'文字)')
+  }
+}
+\NewEnviron{charcount}{\ccinsert{\BODY}}
