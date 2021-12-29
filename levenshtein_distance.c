@@ -31,12 +31,6 @@ int main(int argc, char **argv) {
     size_t len1 = strlen(str1);
     size_t len2 = strlen(str2);
     int *d = malloc(sizeof(int) * (len1 + 1) * (len2 + 1));
-#ifdef SHOW_STEP
-    signed char *op = malloc(sizeof(signed char) * (len1 + 1) * (len2 + 1));
-    memset(op, -1, sizeof(signed char) * (len1 + 1) * (len2 + 1));
-#define OP(x, y) op[(x) + (y) * (len1 + 1)]
-#endif
-
 #define D(x, y) d[(x) + (y) * (len1 + 1)]
     for (size_t i = 0; i <= len1; ++i) {
         D(i, 0) = i;
@@ -44,6 +38,16 @@ int main(int argc, char **argv) {
     for (size_t i = 1; i <= len2; ++i) {
         D(0, i) = i;
     }
+#ifdef SHOW_STEP
+    signed char *op = malloc(sizeof(signed char) * (len1 + 1) * (len2 + 1));
+#define OP(x, y) op[(x) + (y) * (len1 + 1)]
+    for (size_t i = 1; i <= len1; ++i) {
+        OP(i, 0) = 0;
+    }
+    for (size_t i = 1; i <= len2; ++i) {
+        OP(0, i) = 1;
+    }
+#endif
 
     for (size_t i = 1; i <= len1; ++i) {
         for (size_t j = 1; j <= len2; ++j) {
@@ -66,7 +70,7 @@ int main(int argc, char **argv) {
     size_t y = len2;
     char **operations = malloc(sizeof(char *) * (len1 + len2));
     size_t op_i = 0;
-    while (x != 0 && y != 0) {
+    while (x != 0 || y != 0) {
         switch (OP(x, y)) {
         case 0: {
             char *desc = malloc(sizeof(char) * 9);
