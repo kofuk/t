@@ -22,7 +22,7 @@ static inline int argmin3(int n1, int n2, int n3) {
 
 int main(int argc, char **argv) {
     if (argc < 3) {
-        puts("usage: levenshtein_distance <str1> <str2>");
+        printf("usage: %s <str1> <str2>\n", argv[0]);
         return 1;
     }
 
@@ -30,6 +30,7 @@ int main(int argc, char **argv) {
     char *str2 = argv[2];
     size_t len1 = strlen(str1);
     size_t len2 = strlen(str2);
+#ifdef SHOW_STEP
     int *d = malloc(sizeof(int) * (len1 + 1) * (len2 + 1));
 #define D(x, y) d[(x) + (y) * (len1 + 1)]
     for (size_t i = 0; i <= len1; ++i) {
@@ -38,7 +39,6 @@ int main(int argc, char **argv) {
     for (size_t i = 1; i <= len2; ++i) {
         D(0, i) = i;
     }
-#ifdef SHOW_STEP
     signed char *op = malloc(sizeof(signed char) * (len1 + 1) * (len2 + 1));
 #define OP(x, y) op[(x) + (y) * (len1 + 1)]
     for (size_t i = 1; i <= len1; ++i) {
@@ -47,18 +47,27 @@ int main(int argc, char **argv) {
     for (size_t i = 1; i <= len2; ++i) {
         OP(0, i) = 1;
     }
+#else
+    int *d = malloc(sizeof(int) * (len1 + 1) * 2);
+#define D(x, y) d[(x) + ((y) & (size_t)0x1) * (len1 + 1)]
+    for (size_t i = 0; i <= len1; ++i) {
+        D(i, 0) = i;
+    }
 #endif
 
-    for (size_t i = 1; i <= len1; ++i) {
-        for (size_t j = 1; j <= len2; ++j) {
-            int cost = (int)(str1[i - 1] != str2[j - 1]);
-            D(i, j) = min3(D(i - 1, j) + 1,
-                           D(i, j - 1) + 1,
-                           D(i - 1, j - 1) + cost);
+    for (size_t y = 1; y <= len2; ++y) {
+#ifndef SHOW_STEP
+        D(0, y) = y;
+#endif
+        for (size_t x = 1; x <= len1; ++x) {
+            int cost = (int)(str1[x - 1] != str2[y - 1]);
+            D(x, y) = min3(D(x - 1, y) + 1,
+                           D(x, y - 1) + 1,
+                           D(x - 1, y - 1) + cost);
 #ifdef SHOW_STEP
-            OP(i, j) = argmin3(D(i - 1, j) + 1,
-                               D(i, j - 1) + 1,
-                               D(i - 1, j - 1) + cost);
+            OP(x, y) = argmin3(D(x - 1, y) + 1,
+                               D(x, y - 1) + 1,
+                               D(x - 1, y - 1) + cost);
 #endif
         }
     }
