@@ -19,7 +19,7 @@ table inet filter {
 	chain forward {
 		type filter hook forward priority filter; policy accept;
 		ct state { established, related } accept
-		iifname "wlp11s0" jump rule_hotspot
+		iifname "wlp10s0" jump rule_hotspot
 		reject with icmp type host-unreachable
 	}
 
