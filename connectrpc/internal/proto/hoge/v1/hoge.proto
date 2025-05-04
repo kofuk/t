@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package hoge.v1;
+
+message HogeRequest {
+  int64 num = 1;
+}
+
+message HogeResponse {
+  int64 num = 1;
+}
+
+service HogeService {
+  rpc Hoge(HogeRequest) returns (HogeResponse);
+}
