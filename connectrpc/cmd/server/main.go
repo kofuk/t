@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"net"
 	"net/http"
+	"os"
 
 	hogev1 "connectrpc/internal/gen/hoge/v1"
 	"connectrpc/internal/gen/hoge/v1/hogev1connect"
@@ -24,12 +26,26 @@ func (s *HogeServer) Hoge(ctx context.Context, request *connect.Request[hogev1.H
 
 func main() {
 	hogeServer := &HogeServer{}
-	path, handler := hogev1connect.NewHogeServiceHandler(hogeServer)
-	http.Handle(path, handler)
+
+	mux := http.NewServeMux()
+
+	mux.Handle(hogev1connect.NewHogeServiceHandler(hogeServer))
+
 	reflector := grpcreflect.NewStaticReflector(
 		hogev1connect.HogeServiceName,
 	)
-	http.Handle(grpcreflect.NewHandlerV1(reflector))
-	http.Handle(grpcreflect.NewHandlerV1Alpha(reflector))
-	http.ListenAndServe(":8080", nil)
+	mux.Handle(grpcreflect.NewHandlerV1(reflector))
+	mux.Handle(grpcreflect.NewHandlerV1Alpha(reflector))
+
+	os.Remove("/tmp/hoge.sock")
+	listener, err := net.Listen("unix", "/tmp/hoge.sock")
+	if err != nil {
+		panic(err)
+	}
+
+	server := &http.Server{
+		Handler: mux,
+	}
+
+	panic(server.Serve(listener))
 }
