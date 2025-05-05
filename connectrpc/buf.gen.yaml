@@ -5,10 +5,10 @@ managed:
     - file_option: go_package_prefix
       value: connectrpc/internal/gen
 plugins:
-  - local: protoc-gen-go
+  - local: [go, tool, protoc-gen-go]
     out: internal/gen
     opt: paths=source_relative
-  - local: protoc-gen-connect-go
+  - local: [go, tool, protoc-gen-connect-go]
     out: internal/gen
     opt: paths=source_relative
 clean: true
