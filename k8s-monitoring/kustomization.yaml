@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+resources:
+  - namespace.yaml
+  # We need to install the CRDs manually.
+  - https://github.com/grafana/grafana-operator/releases/download/v5.18.0/crds.yaml
+  - grafana.yaml
+helmCharts:
+  - name: grafana-operator
+    releaseName: grafana-operator
+    repo: https://grafana.github.io/helm-charts
+    version: v5.18.0
+    valuesInline:
+      # serviceMonitor:
+      #   enabled: true
+      dashboard:
+        enabled: true
