@@ -3,16 +3,34 @@ kind: Kustomization
 namespace: monitoring
 resources:
   - namespace.yaml
-  # We need to install the CRDs manually.
-  - https://github.com/grafana/grafana-operator/releases/download/v5.18.0/crds.yaml
-  - grafana.yaml
+  - dashboard.yaml
 helmCharts:
-  - name: grafana-operator
-    releaseName: grafana-operator
-    repo: https://grafana.github.io/helm-charts
-    version: v5.18.0
+  - name: kube-prometheus-stack
+    releaseName: kube-prometheus-stack
+    repo: https://prometheus-community.github.io/helm-charts
+    version: 75.4.0
     valuesInline:
-      # serviceMonitor:
-      #   enabled: true
-      dashboard:
+      # This needs to be set in order to internally query the Prometheus instance.
+      namespaceOverride: monitoring
+      crds:
         enabled: true
+        upgradeJob:
+          enabled: true
+      grafana:
+        enabled: true
+        operator:
+          matchLabels:
+            dashboards: grafana
+        defaultDashboardsTimezone: browser
+      nodeExporter:
+        operatingSystems:
+          aix:
+            enabled: false
+          darwin:
+            enabled: false
+      sidecar:
+        dashboard:
+          label: grafanaDashboard
+        datasource:
+          label: grafanaDatasource
+
