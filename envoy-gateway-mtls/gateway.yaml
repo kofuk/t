@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway
+  namespace: gateway
+spec:
+  gatewayClassName: eg
+  listeners:
+    - name: sample-app
+      protocol: HTTPS
+      port: 443
+      hostname: mtls.test.local
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: sample-app-server-tls
+            kind: Secret
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: sample-app-server-tls
+  namespace: gateway
+spec:
+  dnsNames:
+    - mtls.test.local
+  issuerRef:
+    kind: ClusterIssuer
+    name: issuer
+  secretName: sample-app-server-tls
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: enable-mtls
+  namespace: gateway
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gateway
+      sectionName: sample-app
+  tls:
+    clientValidation:
+      optional: true
+      caCertificateRefs:
+        - kind: Secret
+          group: ''
+          name: sample-app-ca-cert
+  headers:
+    xForwardedClientCert:
+      mode: SanitizeSet
+      certDetailsToAdd:
+        - Subject
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sample-app-ca-cert
+  namespace: gateway
+stringData:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDPTCCAiWgAwIBAgIUCIYT4P6L0eaSF3J4XFMycVjaY40wDQYJKoZIhvcNAQEL
+    BQAwLjEVMBMGA1UECgwMZXhhbXBsZSBJbmMuMRUwEwYDVQQDDAwqLnRlc3QubG9j
+    YWwwHhcNMjUxMjIwMTE0NzEzWhcNMjYxMjIwMTE0NzEzWjAuMRUwEwYDVQQKDAxl
+    eGFtcGxlIEluYy4xFTATBgNVBAMMDCoudGVzdC5sb2NhbDCCASIwDQYJKoZIhvcN
+    AQEBBQADggEPADCCAQoCggEBALhGXmMttiIpPMjgDpZsGQrFc7pn79+xjJqbVvIE
+    e4gXlv9kevihJUOIcqLFxiQeEgjhW4BdhGyqK4eKzJYDZAwoyMOHP5qr/PHl8XBt
+    a0LS99s5hoJOeBJHsK7BEDqAfo/XIDkzQTByMO3j1J+GFd9x2K0S4v0n5wMGkjVA
+    KqN1as2qePhbDJ2Ttf7rOVRvx1hzp1tEsnJGjwNorDAxCifdK/Av78IyAaXvE3Pm
+    9JGoKC43YRMCqZiZiYnvmvkKf0l05UBuaev2cm6pBRSioQz2au0ZBAEO6hFbWApg
+    QrGAe9F4oNbgfOvOh+SqU2zvE8AoePeZrJr+lZhv1N6j3QMCAwEAAaNTMFEwHQYD
+    VR0OBBYEFK6A+AkUyI+rtTI5dE1L1BclLtdXMB8GA1UdIwQYMBaAFK6A+AkUyI+r
+    tTI5dE1L1BclLtdXMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEB
+    AD0A+wup7Z4tD0qFSPWks0F0ODSt/g/svhI4E2Pr2Lo0+eAwchm0/rEQrR8Zn2d0
+    A8/8edR1K0YXTPuCD0fc1ZbyeVHl1eywDXl2Bm18+PmGTqBFeDqTw9PIIuiinDTX
+    9el8PfALISc70yCSe4/xsqjdSB1rntacf9VEiYh5PmQ16CwvmrRcoEy9Jj7AUvLm
+    1048kxTf1O0wlxC+3MKlL5/Y3WCrKZrwDXO5OzNF7+1wRE5pFxI1sz/+u8M19RAX
+    TBQY4uqk8QHSvYh6R937pqNH2Nm2cOMh/eCHjqy2xVtrUbsZPeF0eDyPJKDftG3i
+    7F4R+tF7wIz6drg0TlA0qa8=
+    -----END CERTIFICATE-----
