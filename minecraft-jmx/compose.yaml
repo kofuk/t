@@ -1,0 +1,20 @@
+services:
+  prometheus:
+    image: prom/prometheus:v3.10.0@sha256:4a61322ac1103a0e3aea2a61ef1718422a48fa046441f299d71e660a3bc71ae9
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+      # - '--storage.tsdb.path=/prometheus'
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+  grafana:
+    image: grafana/grafana:12.3@sha256:a604f143dbb145a16cd58d22b1451826ee59fcf9de561dc6d698b1de222272d0
+    container_name: grafana
+    ports:
+      - '3000:3000'
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    # Grafana の Datasource 設定で http://prometheus:9090 の URL で Prometheus datasource を追加する

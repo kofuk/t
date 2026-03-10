@@ -1,0 +1,8 @@
+*
+!/.gitignore
+!/compose.yaml
+!/dashboard.json
+!/jmx_config.yaml
+!/launch.sh
+!/prometheus.yaml
+!/server.properties
