@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package testservice.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "grpc-test-server/gen/testservice/v1;testservicev1";
+
+service TestService {
+  rpc Echo(EchoRequest) returns (EchoResponse);
+}
+
+message EchoRequest {
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Duration duration = 3;
+}
+
+message EchoResponse {
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Duration duration = 3;
+}
